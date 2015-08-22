@@ -3,7 +3,7 @@ function run_batchAnalysis
 
   datacases = 1:14;
   %metrics = {'angle', 'hsDist', 'aDist', 'yetisen'};
-  metrics = {'angle', 'hsDist'};
+  metrics = {'angle', 'aDist'};
 
   tests = loadColorTests();
   testNames = [tests(1).name];
@@ -12,6 +12,8 @@ function run_batchAnalysis
     testNames = [ testNames, ', ', tests(i).name ];
     blanks = [ blanks, ', ' ];
   end
+
+  colorBar = loadColorBar();
 
   outString = [ 'datacase' ];
   metricString  = [ ];
@@ -41,7 +43,7 @@ function run_batchAnalysis
       disp(['Working on metric ', num2str(j), ' of ', ...
         num2str(nMetrics) ]);
 
-      results = analyzeDipstick( data, tests, metrics{j} );
+      results = analyzeDipstick( data, tests, colorBar, metrics{j} );
       resultsString = [num2str(results(1))];
       for rIndx=2:numel(results)
         resultsString = [ resultsString, ', ', num2str(results(rIndx)) ];

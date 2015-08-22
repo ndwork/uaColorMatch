@@ -1,11 +1,12 @@
 
-function results = analyzeDipstick( data, tests, varargin )
+function results = analyzeDipstick( data, tests, colorBar, varargin )
   % results = analyzeDipstick( data, tests [, metric] )
   % metric is an optional string supplied to specify which distance
   %   metric to use.  By default, the angle distance is used.
 
   defaultMetric = 'angle';
-  possibleMetrics = {'angle', 'hsDist', 'aDist', 'yetisen'};
+  possibleMetrics = { 'angle', 'hsDist', 'aDist', 'yetisen', ...
+    'relativeBrightness' };
   p = inputParser;
   p.addOptional( 'metric', defaultMetric, ...
     @(x) any(validatestring(x,possibleMetrics)) );
@@ -13,17 +14,20 @@ function results = analyzeDipstick( data, tests, varargin )
   metric = p.Results.metric;
 
 
-  %[timingIndx, rotk] = findTimingIndx( data );
-timingIndx = 18;
-rotk = 1;
+  [timingIndx, rotk] = findTimingIndx( data );
 
   timingTemplate = getTimingTemplate();
   sTemplate = size( timingTemplate );
   halfNccR = ceil(sTemplate(1)/2);
   halfNccC = ceil(sTemplate(2)/2);
 
-colorH = figure;
-testH = figure;
+%colorH = figure;
+%testH = figure;
+
+  colorImg = imread( colorBar.file );
+  colorBarGrayRGB = squeeze( colorImg( ...
+    colorBar.gray(2), colorBar.gray(1), : ) );
+  colorBarGrayHSV = rgb2hsv( colorBarGrayRGB' );
 
   nTests = numel(tests);
   results = zeros(nTests,1);
@@ -86,18 +90,26 @@ testH = figure;
     testHSV = rgb2hsv( testVec' );
     testLAB = squeeze( rgb2lab( testVec(1), testVec(2), testVec(3) ) );
 
-figure(testH); imshow( vertAligned, [] ); title('Test Image');
-hold on; plot( testX, testY, '+' ); drawnow;
+    testGrayRGB = squeeze( vertAligned( ...
+      y2 + colorBar.grayOffset(2), ...
+      x2 + colorBar.grayOffset(1), : ) );
+    testGrayHSV = rgb2hsv( testGrayRGB' );
+
+%figure(testH); imshow( vertAligned, [] ); title('Test Image');
+%hold on; plot( testX, testY, '+' ); drawnow;
 
     colorPadImg = imread( tests(i).colorFile );
     colorPadImg = double( colorPadImg ) / 255.;
 
-    nTestPad = numel( tests(i).x );
-    dists = zeros(nTestPad,1);
-    for j=1:nTestPad
+    colorBarGrayRGB = colorPadImg( colorBar.gray(2), colorBar.gray(1), : );
+    colorBarGrayHSV = rgb2hsv( colorBarGrayRGB );
 
-figure(colorH); imshow(colorPadImg); title('Color Image');
-hold on; plot(tests(i).x(j),tests(i).y(j),'+'); drawnow;
+    nTestColors = numel( tests(i).x );
+    dists = zeros(nTestColors,1);
+    for j=1:nTestColors
+
+%figure(colorH); imshow(colorPadImg); title('Color Image');
+%hold on; plot(tests(i).x(j),tests(i).y(j),'+'); drawnow;
 
       padRGB = squeeze( colorPadImg(tests(i).y(j),tests(i).x(j),:) );
       padNorm = norm( padRGB, 2 );
@@ -113,10 +125,14 @@ hold on; plot(tests(i).x(j),tests(i).y(j),'+'); drawnow;
           dists(j) = calculateHsMetric( testHSV, padHSV );
 
         case 'aDist'
-          dists(j) = abs( testLAB(2) - padLAB(2) );  % works on BIL
+          dists(j) = abs( testLAB(2) - padLAB(2) );
 
         case 'yetisen'
           dists(j) = calculateYetisenMetric( testRGB, padRGB );
+
+        case 'relativeBrightness'
+          dists(j) = calculateRelativeBrightness( testHSV, testGrayHSV, ...
+            padHSV, colorBarGrayHSV);
       end
       %dists(j) = sqrt( sum( (padColor./padNorm - testVec).^2 ) );
 
@@ -126,6 +142,21 @@ hold on; plot(tests(i).x(j),tests(i).y(j),'+'); drawnow;
     results(i) = bestMatch;
   end
 
+end
+
+
+function out = calculateRelativeBrightness(testHSV, testGrayHSV, ...
+  padHSV, colorBarGrayHSV )
+
+  testV = testHSV(3);
+  testGrayV = testGrayHSV(3);
+  
+  padV = padHSV(3);
+  colorBarGrayV = colorBarGrayHSV(3);
+
+  modTestV = testV * colorBarGrayV / testGrayV;
+
+  out = abs( modTestV - padV );  
 end
 
 
