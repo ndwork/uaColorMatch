@@ -13,8 +13,10 @@ function results = analyzeDipstick( data, tests, colorBar, varargin )
   p.parse(varargin{:});
   metric = p.Results.metric;
 
+  zeroBorderNCC = 100;  % pixels
+  
 
-  [timingIndx, rotk] = findTimingIndx( data );
+  [timingIndx, rotk] = findTimingIndx( data, zeroBorderNCC );
 
   timingTemplate = getTimingTemplate();
   sTemplate = size( timingTemplate );
@@ -61,6 +63,8 @@ function results = analyzeDipstick( data, tests, colorBar, varargin )
 
     ncc = normxcorr2( timingTemplate, vImg );
     ncc = ncc( halfNccR:end-halfNccR, halfNccC:end-halfNccC );
+    ncc(:,1:zeroBorderNCC) = 0;  ncc(:,end-zeroBorderNCC:end) = 0;
+    ncc(1:zeroBorderNCC,:) = 0;  ncc(end-zeroBorderNCC:end,:) = 0;
 
     nR = size(ncc,1);
     halfR = ceil(nR/2);
@@ -195,86 +199,5 @@ function out = calculateHsMetric( hsv1, hsv2 )
   out = sqrt( (x1-x2)^2 + (y1-y2)^2 );
 end
 
-
-function [startTimingIndx,rotk] = findTimingIndx( data )
-
-  nccThresh = 0.85;
-
-  timingTemplate = getTimingTemplate();
-
-
-  % Find the frame where timing begins
-  startTimingIndx = 0;
-  nFiles = numel(data.files);
-  nccs = zeros(nFiles,1);
-  rotk = 0;
-  for i=1:nFiles
-    if mod(i,10)==0
-      disp([ 'findTiming frame ', num2str(i), ' of ', ...
-        num2str(nFiles) ]);
-    end
-    file = [ data.directory, '/', data.files(i).name ];
-    if numel( regexp( file, 'jpg$' ) ) == 0, continue; end;
-    img = imread( file );
-    hsv = rgb2hsv(img);
-    v = hsv(:,:,3);
-    sV = size(v);
-    if sV(2) > sV(1)
-      rotk = 1;
-      v = rot90( v );
-    end
-    ncc = normxcorr2( timingTemplate, v );
-    maxNCC1 = max( ncc(:) );
-    v = rot90( v, 2 );
-    ncc = normxcorr2( timingTemplate, v );
-    maxNCC2 = max( ncc(:) );
-    maxNCC = max( maxNCC1, maxNCC2 );
-    nccs(i) = maxNCC;
-    if maxNCC > nccThresh
-      startTimingIndx = i;
-      if maxNCC2 > maxNCC1, rotk = rotk + 2; end;
-      break;
-    end
-  end
-
-  if startTimingIndx == 0
-    error('Never found frame to start timing');
-    return;
-  end
-
-end
-
-
-function template = getTimingTemplate()
-  % Get the template
-  timingFile1 = './calibrations/timing1.jpg';
-  template1 = getTimingTemplateComponent( timingFile1, ...
-    438, 354, 631, 675, 438, 1274 );
-  timingFile2 = './calibrations/timing2.jpg';
-  diffX = 631-438;
-  diffY = 675-354;
-  template2 = getTimingTemplateComponent( timingFile2, ...
-    486, 362, 486+diffX, 362+diffY, 502, 1282 );
-  template = ( template1 + template2 ) / 2;
-end
-
-
-function template = getTimingTemplateComponent( file, ...
-  minX1, minY1, maxX1, maxY1, minX2, minY2 )
-
-  img = imread( file );
-  img = double( img ) / 255;
-  hsv = rgb2hsv(img);
-  v = hsv(:,:,3);
-
-  timingTemplate1 = img( minY1:maxY1, minX1:maxX1 );
-  diffX = maxX1 - minX1;
-  diffY = maxY1 - minY1;
-  maxX2 = minX2 + diffX;
-  maxY2 = minY2 + diffY;
-  timingTemplate2 = img( minY2:maxY2, minX2:maxX2 );
-  
-  template = ( timingTemplate1 + timingTemplate2 ) / 2;
-end
 
 

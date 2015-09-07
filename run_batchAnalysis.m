@@ -1,9 +1,10 @@
 
 function run_batchAnalysis
+  close all; clear;
 
-  datacases = 1:14;
-  %metrics = {'angle', 'hsDist', 'aDist', 'yetisen'};
-  metrics = {'angle', 'aDist'};
+  datacases = 1:30;
+  %metrics = {'angle', 'relativeBrightness', 'hsDist', 'aDist', 'yetisen'};
+  metrics = {'angle'};
 
   tests = loadColorTests();
   testNames = [tests(1).name];
@@ -15,28 +16,36 @@ function run_batchAnalysis
 
   colorBar = loadColorBar();
 
-  outString = [ 'datacase' ];
-  metricString  = [ ];
+  outString = [ 'datacase, date, type' ];
+  %metricString  = [ ', , ' ];
+  outStringParts = strsplit( outString, ',' );
+  for i=1:numel(outStringParts)
+    outStringParts{i} = ' ';
+  end
+  metricString = strjoin( outStringParts, ', ' );
   for i=1:numel(metrics)
     outString = [ outString, ', ', testNames ];
     metricString = [ metricString, ', ', metrics{i}, blanks ];
   end
 
-  outFileId = fopen('batch.csv','w');
-  fprintf( outFileId, [metricString,'\n'] );
-  fprintf( outFileId, [outString,'\n'] );
-
+  outFileID = fopen('batch.csv','w');
+  fprintf( outFileID, [metricString,'\n'] );
+  fprintf( outFileID, [outString,'\n'] );
+ 
   nDatacases = numel(datacases);
-  for i=1:nDatacases
+  outStrings = cell(nDatacases,1);
+  
+  parfor i=1:nDatacases
     disp(['Working on datacase ', num2str(i), ' of ', ...
       num2str(nDatacases)]);
     close all;
-    
+
     data = loadData( datacases(i) );
     dataDirParts = strsplit( data.directory, '/' );
-    datacaseName = dataDirParts{end};
+    datacaseType = dataDirParts{end-2};
+    datacaseName = [ dataDirParts{end}, ', ', dataDirParts{end-1} ];
 
-    outString = [ datacaseName ];
+    outString = [ datacaseName, ', ', datacaseType ];
 
     nMetrics = numel(metrics);
     for j=1:nMetrics
@@ -52,8 +61,12 @@ function run_batchAnalysis
       outString = [ outString, ', ', resultsString ];
     end
 
-    fprintf( outFileId, [outString,'\n'] );
+    outStrings{i} = outString;
   end
 
-  fclose(outFileId);
+  for i=1:numel(outStrings)
+    fprintf( outFileID, [outStrings{i},'\n'] );
+  end
+  
+  fclose(outFileID);
 end
